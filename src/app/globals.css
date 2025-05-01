@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+:root {
+  --primary-color: #ff6600;
+  --secondary-color: #ffffff;
+  --text-color: #333333;
+}
+
+body {
+  @apply bg-white text-[#333333] font-sans;
+}
+
+button {
+  @apply bg-[#ff6600] text-[#ffffff] py-2 px-4 rounded hover:bg-orange-500;
+}
+
+input {
+  @apply border border-gray-300 rounded py-2 px-4 mb-4;
+}
+
+form {
+  @apply flex flex-col gap-4 max-w-md mx-auto;
+}
+
+h1 {
+  @apply text-[#ff6600] text-center text-3xl font-bold;
+}
+
+ul li {
+  @apply bg-gray-100 border border-gray-200 rounded p-4 mb-2;
+}
