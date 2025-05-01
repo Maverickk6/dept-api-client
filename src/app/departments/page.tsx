@@ -17,27 +17,28 @@ interface Department {
 export default function Departments() {
   const router = useRouter();
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [page, setPage] = useState(1);
   const [newDepartment, setNewDepartment] = useState('');
-  const [subDepartments, setSubDepartments] = useState<{ [key: number]: string }>({});
+  const [newSubDepartment, setNewSubDepartment] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [isAdding, setIsAdding] = useState(false);
-  const limit = 10;
+  const [loading, setLoading] = useState({
+    departments: false,
+    operations: false,
+  });
 
   const fetchDepartments = useCallback(async () => {
     try {
-      setLoading(true);
-      const data = await api.getDepartments(page, limit);
+      setLoading(prev => ({ ...prev, departments: true }));
+      const data = await api.getDepartments();
       setDepartments(data);
+      setError('');
     } catch (error) {
-      setError('Failed to fetch departments');
+      setError(error instanceof Error ? error.message : 'Failed to fetch departments');
       console.error('Error fetching departments:', error);
     } finally {
-      setLoading(false);
+      setLoading(prev => ({ ...prev, departments: false }));
     }
-  }, [page]);
+  }, []);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -51,105 +52,182 @@ export default function Departments() {
   const handleCreateDepartment = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      setIsAdding(true);
-      const newDeptData = await api.createDepartment({ name: newDepartment });
-      setDepartments(prev => {
-        const updated = [...prev];
-        if (updated.length >= limit) {
-          updated.pop();
-        }
-        return [newDeptData, ...updated];
-      });
+      setLoading(prev => ({ ...prev, operations: true }));
+      const newDept = await api.createDepartment({ name: newDepartment });
+      setDepartments(prev => [newDept, ...prev]);
       setNewDepartment('');
       setError('');
     } catch (error) {
-      setError('Failed to create department');
+      setError(error instanceof Error ? error.message : 'Failed to create department');
       console.error('Error creating department:', error);
     } finally {
-      setIsAdding(false);
+      setLoading(prev => ({ ...prev, operations: false }));
     }
   };
 
-  const handleAddSubDepartment = async (departmentId: number) => {
+  const handleCreateSubDepartment = async (departmentId: number) => {
     try {
-      setIsAdding(true);
-      const newSubDeptName = subDepartments[departmentId];
-      if (!newSubDeptName?.trim()) return;
-
-      const updatedDept = await api.addSubDepartment(departmentId, {
-        name: newSubDeptName
-      });
-
-      setDepartments(prev => 
-        prev.map(dept => 
-          dept.id === departmentId ? updatedDept : dept
+      setLoading(prev => ({ ...prev, operations: true }));
+      const newSubDept = await api.createSubDepartment(departmentId, { name: newSubDepartment });
+      
+      setDepartments(prev =>
+        prev.map(dept =>
+          dept.id === departmentId
+            ? {
+                ...dept,
+                subDepartments: [...(dept.subDepartments || []), newSubDept],
+              }
+            : dept
         )
       );
 
-      setSubDepartments(prev => ({ ...prev, [departmentId]: '' }));
-      setError('');
-
       if (selectedDepartment?.id === departmentId) {
-        setSelectedDepartment(updatedDept);
+        setSelectedDepartment(prev => ({
+          ...prev!,
+          subDepartments: [...(prev?.subDepartments || []), newSubDept],
+        }));
       }
+
+      setNewSubDepartment('');
+      setError('');
     } catch (error) {
-      setError('Failed to add sub-department');
-      console.error('Error adding sub-department:', error);
+      setError(error instanceof Error ? error.message : 'Failed to create sub-department');
+      console.error('Error creating sub-department:', error);
     } finally {
-      setIsAdding(false);
+      setLoading(prev => ({ ...prev, operations: false }));
     }
   };
 
-  const handleDeleteSubDepartment = async (departmentId: number, subDepartmentId: number) => {
+  const handleUpdateDepartment = async (id: number, newName: string) => {
     try {
-      setIsAdding(true);
-      await api.deleteSubDepartment(departmentId, subDepartmentId);
-
-      setDepartments(prev => 
-        prev.map(dept => {
-          if (dept.id === departmentId) {
-            return {
-              ...dept,
-              subDepartments: dept.subDepartments?.filter(sub => sub.id !== subDepartmentId)
-            };
-          }
-          return dept;
-        })
+      setLoading(prev => ({ ...prev, operations: true }));
+      const updatedDept = await api.updateDepartment(id, { name: newName });
+      
+      setDepartments(prev =>
+        prev.map(dept => (dept.id === id ? updatedDept : dept))
       );
 
-      if (selectedDepartment?.id === departmentId) {
-        const updatedDept = await api.getDepartmentHierarchy(departmentId);
+      if (selectedDepartment?.id === id) {
         setSelectedDepartment(updatedDept);
       }
 
       setError('');
     } catch (error) {
-      setError('Failed to delete sub-department');
-      console.error('Error deleting sub-department:', error);
+      setError(error instanceof Error ? error.message : 'Failed to update department');
+      console.error('Error updating department:', error);
     } finally {
-      setIsAdding(false);
+      setLoading(prev => ({ ...prev, operations: false }));
+    }
+  };
+
+  const handleUpdateSubDepartment = async (
+    departmentId: number,
+    subDepartmentId: number,
+    newName: string
+  ) => {
+    try {
+      setLoading(prev => ({ ...prev, operations: true }));
+      const updatedSubDept = await api.updateSubDepartment(departmentId, subDepartmentId, {
+        name: newName,
+      });
+
+      setDepartments(prev =>
+        prev.map(dept =>
+          dept.id === departmentId
+            ? {
+                ...dept,
+                subDepartments: dept.subDepartments?.map(sub =>
+                  sub.id === subDepartmentId ? updatedSubDept : sub
+                ),
+              }
+            : dept
+        )
+      );
+
+      if (selectedDepartment?.id === departmentId) {
+        setSelectedDepartment(prev => ({
+          ...prev!,
+          subDepartments: prev?.subDepartments?.map(sub =>
+            sub.id === subDepartmentId ? updatedSubDept : sub
+          ),
+        }));
+      }
+
+      setError('');
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to update sub-department');
+      console.error('Error updating sub-department:', error);
+    } finally {
+      setLoading(prev => ({ ...prev, operations: false }));
     }
   };
 
   const handleDeleteDepartment = async (id: number) => {
     try {
+      setLoading(prev => ({ ...prev, operations: true }));
       await api.deleteDepartment(id);
       setDepartments(prev => prev.filter(dept => dept.id !== id));
+      
+      if (selectedDepartment?.id === id) {
+        setSelectedDepartment(null);
+      }
+      
       setError('');
     } catch (error) {
-      setError('Failed to delete department');
+      setError(error instanceof Error ? error.message : 'Failed to delete department');
       console.error('Error deleting department:', error);
+    } finally {
+      setLoading(prev => ({ ...prev, operations: false }));
     }
   };
 
-  const handleViewHierarchy = async (id: number) => {
+  const handleDeleteSubDepartment = async (departmentId: number, subDepartmentId: number) => {
     try {
-      const hierarchy = await api.getDepartmentHierarchy(id);
-      setSelectedDepartment(hierarchy);
+      setLoading(prev => ({ ...prev, operations: true }));
+      await api.deleteSubDepartment(departmentId, subDepartmentId);
+
+      setDepartments(prev =>
+        prev.map(dept =>
+          dept.id === departmentId
+            ? {
+                ...dept,
+                subDepartments: dept.subDepartments?.filter(
+                  sub => sub.id !== subDepartmentId
+                ),
+              }
+            : dept
+        )
+      );
+
+      if (selectedDepartment?.id === departmentId) {
+        setSelectedDepartment(prev => ({
+          ...prev!,
+          subDepartments: prev?.subDepartments?.filter(
+            sub => sub.id !== subDepartmentId
+          ),
+        }));
+      }
+
       setError('');
     } catch (error) {
-      setError('Failed to fetch department hierarchy');
-      console.error('Error fetching hierarchy:', error);
+      setError(error instanceof Error ? error.message : 'Failed to delete sub-department');
+      console.error('Error deleting sub-department:', error);
+    } finally {
+      setLoading(prev => ({ ...prev, operations: false }));
+    }
+  };
+
+  const handleViewDetails = async (id: number) => {
+    try {
+      setLoading(prev => ({ ...prev, departments: true }));
+      const department = await api.getDepartmentById(id);
+      setSelectedDepartment(department);
+      setError('');
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to fetch department details');
+      console.error('Error fetching department details:', error);
+    } finally {
+      setLoading(prev => ({ ...prev, departments: false }));
     }
   };
 
@@ -168,136 +246,191 @@ export default function Departments() {
           <div>
             <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
               <h2 className="text-xl font-semibold text-gray-800 mb-4">Create New Department</h2>
-              <form onSubmit={handleCreateDepartment} className="mb-4">
-                <div className="flex gap-4">
-                  <input
-                    type="text"
-                    value={newDepartment}
-                    onChange={(e) => setNewDepartment(e.target.value)}
-                    placeholder="Department name"
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                  <button 
-                    type="submit"
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                    disabled={isAdding}
-                  >
-                    Create
-                  </button>
-                </div>
+              <form onSubmit={handleCreateDepartment} className="flex gap-4">
+                <input
+                  type="text"
+                  value={newDepartment}
+                  onChange={(e) => setNewDepartment(e.target.value)}
+                  placeholder="Department name"
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                  minLength={2}
+                />
+                <button 
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+                  disabled={loading.operations || !newDepartment.trim()}
+                >
+                  {loading.operations ? 'Creating...' : 'Create'}
+                </button>
               </form>
             </div>
 
             <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">Departments List</h2>
-              {loading ? (
+              <h2 className="text-xl font-semibold text-gray-800 mb-4">Departments</h2>
+              {loading.departments ? (
                 <div className="flex justify-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 </div>
+              ) : departments.length === 0 ? (
+                <p className="text-gray-500">No departments found</p>
               ) : (
-                <ul className="space-y-4">
-                  {departments.map((dept) => (
-                    <li key={dept.id} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-medium text-gray-900">{dept.name}</h3>
+                <div className="space-y-4">
+                  {departments.map((department) => (
+                    <div key={department.id} className="border border-gray-200 rounded-lg p-4">
+                      <div className="flex justify-between items-center mb-3">
+                        <h3 className="text-lg font-medium text-gray-900">{department.name}</h3>
                         <div className="flex gap-2">
                           <button
-                            onClick={() => handleViewHierarchy(dept.id)}
+                            onClick={() => handleViewDetails(department.id)}
                             className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                           >
-                            View Hierarchy
+                            View
                           </button>
                           <button
-                            onClick={() => handleDeleteDepartment(dept.id)}
-                            className="px-3 py-1.5 bg-red-600 text-white text-sm rounded hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                            onClick={() => handleDeleteDepartment(department.id)}
+                            className="px-3 py-1.5 bg-red-600 text-white text-sm rounded hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50"
+                            disabled={loading.operations}
                           >
                             Delete
                           </button>
                         </div>
                       </div>
                       
-                      <div className="space-y-2">
-                        {dept.subDepartments && dept.subDepartments.length > 0 && (
-                          <ul className="ml-4 space-y-1">
-                            {dept.subDepartments.map(sub => (
-                              <li key={sub.id} className="flex items-center justify-between text-sm text-gray-600 py-1">
-                                <span>• {sub.name}</span>
-                                <button
-                                  onClick={() => handleDeleteSubDepartment(dept.id, sub.id)}
-                                  className="px-2 py-1 text-xs bg-red-100 text-red-600 rounded hover:bg-red-200 focus:outline-none focus:ring-1 focus:ring-red-500"
-                                >
-                                  Remove
-                                </button>
+                      <div className="pl-4 border-l-2 border-gray-200">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Sub-Departments</h4>
+                        
+                        {department.subDepartments && department.subDepartments.length > 0 ? (
+                          <ul className="space-y-2 mb-3">
+                            {department.subDepartments.map((subDept) => (
+                              <li key={subDept.id} className="flex items-center justify-between">
+                                <span className="text-gray-600">{subDept.name}</span>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => handleDeleteSubDepartment(department.id, subDept.id)}
+                                    className="px-2 py-1 text-xs bg-red-100 text-red-600 rounded hover:bg-red-200 focus:outline-none focus:ring-1 focus:ring-red-500 disabled:opacity-50"
+                                    disabled={loading.operations}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
                               </li>
                             ))}
                           </ul>
+                        ) : (
+                          <p className="text-gray-500 text-sm mb-3">No sub-departments</p>
                         )}
-                        
-                        <div className="flex gap-2 mt-3">
+
+                        <div className="flex gap-2">
                           <input
                             type="text"
-                            value={subDepartments[dept.id] || ''}
-                            onChange={(e) => setSubDepartments(prev => ({
-                              ...prev,
-                              [dept.id]: e.target.value
-                            }))}
-                            placeholder="New sub-department name"
+                            value={newSubDepartment}
+                            onChange={(e) => setNewSubDepartment(e.target.value)}
+                            placeholder="New sub-department"
                             className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            minLength={2}
                           />
                           <button
-                            onClick={() => handleAddSubDepartment(dept.id)}
-                            className="px-3 py-1.5 bg-green-600 text-white text-sm rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-                            disabled={isAdding || !subDepartments[dept.id]?.trim()}
+                            onClick={() => handleCreateSubDepartment(department.id)}
+                            className="px-3 py-1.5 bg-green-600 text-white text-sm rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50"
+                            disabled={loading.operations || !newSubDepartment.trim()}
                           >
                             Add
                           </button>
                         </div>
                       </div>
-                    </li>
+                    </div>
                   ))}
-                </ul>
+                </div>
               )}
-
-              <div className="flex justify-center items-center gap-4 mt-8">
-                <button
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="px-4 py-2 bg-gray-100 text-gray-800 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-                >
-                  Previous
-                </button>
-                <span className="text-gray-600">Page {page}</span>
-                <button
-                  onClick={() => setPage(p => p + 1)}
-                  disabled={departments.length < limit}
-                  className="px-4 py-2 bg-gray-100 text-gray-800 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-                >
-                  Next
-                </button>
-              </div>
             </div>
           </div>
 
-          {selectedDepartment && (
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">Department Hierarchy</h2>
-              <div className="border-l-2 border-blue-200 pl-4">
-                <h3 className="font-medium text-gray-900">{selectedDepartment.name}</h3>
-                {selectedDepartment.subDepartments && selectedDepartment.subDepartments.length > 0 ? (
-                  <ul className="mt-2 space-y-2">
-                    {selectedDepartment.subDepartments.map(sub => (
-                      <li key={sub.id} className="text-gray-600">
-                        • {sub.name}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-gray-500 mt-2">No sub-departments</p>
-                )}
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">
+              {selectedDepartment ? `${selectedDepartment.name} Details` : 'Select a Department'}
+            </h2>
+            
+            {selectedDepartment ? (
+              <div>
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Department Name
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={selectedDepartment.name}
+                      onChange={(e) => {
+                        setSelectedDepartment({
+                          ...selectedDepartment,
+                          name: e.target.value,
+                        });
+                      }}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      onClick={() => handleUpdateDepartment(selectedDepartment.id, selectedDepartment.name)}
+                      className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+                      disabled={loading.operations}
+                    >
+                      Update
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-3">Sub-Departments</h3>
+                  
+                  {selectedDepartment.subDepartments && selectedDepartment.subDepartments.length > 0 ? (
+                    <ul className="space-y-3">
+                      {selectedDepartment.subDepartments.map((subDept) => (
+                        <li key={subDept.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                          <input
+                            type="text"
+                            value={subDept.name}
+                            onChange={(e) => {
+                              setSelectedDepartment({
+                                ...selectedDepartment,
+                                subDepartments: selectedDepartment.subDepartments?.map(sub =>
+                                  sub.id === subDept.id ? { ...sub, name: e.target.value } : sub
+                                ),
+                              });
+                            }}
+                            className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                          <div className="flex gap-2 ml-3">
+                            <button
+                              onClick={() => handleUpdateSubDepartment(
+                                selectedDepartment.id,
+                                subDept.id,
+                                subDept.name
+                              )}
+                              className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+                              disabled={loading.operations}
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => handleDeleteSubDepartment(selectedDepartment.id, subDept.id)}
+                              className="px-3 py-1.5 bg-red-600 text-white text-sm rounded hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50"
+                              disabled={loading.operations}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-gray-500">No sub-departments</p>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            ) : (
+              <p className="text-gray-500">Select a department to view details</p>
+            )}
+          </div>
         </div>
       </main>
     </div>

@@ -1,9 +1,4 @@
-const API_URL = '/api';
-
-interface LoginCredentials {
-  username: string;
-  password: string;
-}
+const API_URL = 'http://127.0.0.1:3000';
 
 interface Department {
   id: number;
@@ -17,118 +12,189 @@ interface SubDepartment {
   department?: Department;
 }
 
-interface ApiError {
-  message: string;
-  statusCode: number;
+interface CreateDepartmentDto {
+  name: string;
+  subDepartments?: { name: string }[];
 }
 
-const handleResponse = async <T>(response: Response): Promise<T> => {
-  if (!response.ok) {
-    let errorMessage = 'An unexpected error occurred';
-    try {
-      const error: ApiError = await response.json();
-      errorMessage = error.message || `HTTP error! status: ${response.status}`;
-      console.error('API Error:', error);
-    } catch {
-      errorMessage = `HTTP error! status: ${response.status}`;
-    }
-    throw new Error(errorMessage);
-  }
-  return response.json();
-};
+interface UpdateDepartmentDto {
+  name?: string;
+  subDepartments?: UpdateSubDepartmentDto[];
+}
+
+interface CreateSubDepartmentDto {
+  name: string;
+}
+
+interface UpdateSubDepartmentDto {
+  id?: number;
+  name?: string;
+}
 
 export const api = {
-  // Auth endpoints
-  login: async (credentials: LoginCredentials) => {
-    const response = await fetch(`${API_URL}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(credentials),
-    });
-    return handleResponse(response);
-  },
-
   // Department endpoints
-  getDepartments: async (page: number = 1, limit: number = 10) => {
-    const response = await fetch(
-      `${API_URL}/departments?page=${page}&limit=${limit}`,
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-      }
-    );
-    return handleResponse<Department[]>(response);
+  getDepartments: async (): Promise<Department[]> => {
+    const response = await fetch(`${API_URL}/departments`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('token')}`,
+      },
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to fetch departments');
+    }
+    return response.json();
   },
 
-  createDepartment: async (department: { name: string; subDepartments?: { name: string }[] }) => {
+  getDepartmentById: async (id: number): Promise<Department> => {
+    const response = await fetch(`${API_URL}/departments/${id}`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('token')}`,
+      },
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      if (response.status === 404) {
+        throw new Error('Department not found');
+      }
+      throw new Error(error.message || 'Failed to fetch department');
+    }
+    return response.json();
+  },
+
+  createDepartment: async (data: CreateDepartmentDto): Promise<Department> => {
     const response = await fetch(`${API_URL}/departments`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${localStorage.getItem('token')}`,
       },
-      body: JSON.stringify(department),
+      body: JSON.stringify(data),
     });
-    return handleResponse<Department>(response);
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to create department');
+    }
+    return response.json();
   },
 
-  updateDepartment: async (id: number, department: Partial<Department>) => {
+  updateDepartment: async (id: number, data: UpdateDepartmentDto): Promise<Department> => {
     const response = await fetch(`${API_URL}/departments/${id}`, {
-      method: 'PATCH',
+      method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${localStorage.getItem('token')}`,
       },
-      body: JSON.stringify({
-        ...department,
-        id // Include the ID to ensure proper reference
-      }),
+      body: JSON.stringify(data),
     });
-    return handleResponse<Department>(response);
-  },
-
-  addSubDepartment: async (departmentId: number, subDepartment: { name: string }) => {
-    const response = await fetch(`${API_URL}/departments/${departmentId}/subdepartments`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('token')}`,
-      },
-      body: JSON.stringify(subDepartment),
-    });
-    return handleResponse<Department>(response);
-  },
-
-  deleteSubDepartment: async (departmentId: number, subDepartmentId: number) => {
-    const response = await fetch(
-      `${API_URL}/departments/${departmentId}/subdepartments/${subDepartmentId}`,
-      {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
+    if (!response.ok) {
+      const error = await response.json();
+      if (response.status === 404) {
+        throw new Error('Department not found');
       }
-    );
-    return handleResponse<void>(response);
+      throw new Error(error.message || 'Failed to update department');
+    }
+    return response.json();
   },
 
-  deleteDepartment: async (id: number) => {
+  deleteDepartment: async (id: number): Promise<void> => {
     const response = await fetch(`${API_URL}/departments/${id}`, {
       method: 'DELETE',
       headers: {
         Authorization: `Bearer ${localStorage.getItem('token')}`,
       },
     });
-    return handleResponse<void>(response);
+    if (!response.ok) {
+      const error = await response.json();
+      if (response.status === 404) {
+        throw new Error('Department not found');
+      }
+      throw new Error(error.message || 'Failed to delete department');
+    }
   },
 
-  getDepartmentHierarchy: async (id: number) => {
-    const response = await fetch(`${API_URL}/departments/${id}`, {
+  // Sub-department endpoints
+  getSubDepartmentsByDepartment: async (departmentId: number): Promise<SubDepartment[]> => {
+    const response = await fetch(`${API_URL}/departments/${departmentId}/sub-departments`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem('token')}`,
       },
     });
-    return handleResponse<Department>(response);
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to fetch sub-departments');
+    }
+    return response.json();
+  },
+
+  getSubDepartment: async (departmentId: number, subDepartmentId: number): Promise<SubDepartment> => {
+    const response = await fetch(`${API_URL}/departments/${departmentId}/sub-departments/${subDepartmentId}`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('token')}`,
+      },
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      if (response.status === 404) {
+        throw new Error('Sub-department not found');
+      }
+      throw new Error(error.message || 'Failed to fetch sub-department');
+    }
+    return response.json();
+  },
+
+  createSubDepartment: async (departmentId: number, data: CreateSubDepartmentDto): Promise<SubDepartment> => {
+    const response = await fetch(`${API_URL}/departments/${departmentId}/sub-departments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${localStorage.getItem('token')}`,
+      },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to create sub-department');
+    }
+    return response.json();
+  },
+
+  updateSubDepartment: async (
+    departmentId: number,
+    subDepartmentId: number,
+    data: UpdateSubDepartmentDto
+  ): Promise<SubDepartment> => {
+    const response = await fetch(`${API_URL}/departments/${departmentId}/sub-departments/${subDepartmentId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${localStorage.getItem('token')}`,
+      },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      if (response.status === 404) {
+        throw new Error('Sub-department not found');
+      }
+      throw new Error(error.message || 'Failed to update sub-department');
+    }
+    return response.json();
+  },
+
+  deleteSubDepartment: async (departmentId: number, subDepartmentId: number): Promise<void> => {
+    const response = await fetch(`${API_URL}/departments/${departmentId}/sub-departments/${subDepartmentId}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('token')}`,
+      },
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      if (response.status === 404) {
+        throw new Error('Sub-department not found');
+      }
+      throw new Error(error.message || 'Failed to delete sub-department');
+    }
   },
 };
