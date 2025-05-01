@@ -6,6 +6,11 @@ interface Department {
   subDepartments?: SubDepartment[];
 }
 
+interface LoginCredentials {
+  username: string;
+  password: string;
+}
+
 interface SubDepartment {
   id: number;
   name: string;
@@ -31,7 +36,71 @@ interface UpdateSubDepartmentDto {
   name?: string;
 }
 
+interface ApiError {
+  message: string;
+  statusCode: number;
+}
+
+interface AuthResponse {
+  token: string;
+  user: {
+    id: number;
+    username: string;
+    // Add other user fields as needed
+  };
+}
+
+
+const handleResponse = async <T>(response: Response): Promise<T> => {
+  if (!response.ok) {
+    let errorMessage = 'An unexpected error occurred';
+    try {
+      const error: ApiError = await response.json();
+      errorMessage = error.message || `HTTP error! status: ${response.status}`;
+      console.error('API Error:', error);
+    } catch {
+      errorMessage = `HTTP error! status: ${response.status}`;
+    }
+    throw new Error(errorMessage);
+  }
+  return response.json();
+};
+
 export const api = {
+
+  login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
+    try {
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify(credentials),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          errorData.message || 
+          `Login failed with status ${response.status}: ${response.statusText}`
+        );
+      }
+
+      const data: AuthResponse = await response.json();
+      
+      // Store token if authentication is successful
+      if (data.token) {
+        localStorage.setItem('token', data.token);
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Login error:', error);
+      throw new Error(
+        error instanceof Error ? error.message : 'Login failed due to an unexpected error'
+      );
+    }
+  },
   // Department endpoints
   getDepartments: async (): Promise<Department[]> => {
     const response = await fetch(`${API_URL}/departments`, {
