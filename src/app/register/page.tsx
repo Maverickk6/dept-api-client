@@ -1,40 +1,34 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/services/api";
-import {
-  ExclamationCircleIcon,
-  CheckCircleIcon,
-} from "@heroicons/react/24/solid";
+import { ExclamationCircleIcon } from "@heroicons/react/24/solid";
 import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 
-export default function Login() {
+export default function Register() {
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const router = useRouter();
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState(0);
 
-  // Add this at the top of the Login component
-  const [registeredUsername] = useState(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      return params.get("registeredUsername") || "";
-    }
-    return "";
-  });
+  const calculateStrength = (pass: string) => {
+    let strength = 0;
+    if (pass.length >= 8) strength++;
+    if (pass.match(/[A-Z]/)) strength++;
+    if (pass.match(/[0-9]/)) strength++;
+    if (pass.match(/[^A-Za-z0-9]/)) strength++;
+    return strength;
+  };
 
-  useEffect(() => {
-    if (registeredUsername) {
-      setShowSuccess(true);
-      const timer = setTimeout(() => setShowSuccess(false), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [registeredUsername]);
-
-  const [username, setUsername] = useState(registeredUsername);
+  const handlePasswordChange = (value: string) => {
+    setPassword(value);
+    setPasswordStrength(calculateStrength(value));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,11 +36,11 @@ export default function Login() {
     setIsSubmitting(true);
 
     try {
-      const response = await api.login({ username, password });
-      localStorage.setItem("token", response.access_token);
-      router.push("/departments");
+      await api.register({ username, password });
+      // Redirect to login with the username as query parameter
+      router.push(`/login?registeredUsername=${encodeURIComponent(username)}`);
     } catch (err) {
-      setError("Invalid username or password");
+      setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
       setIsSubmitting(false);
     }
@@ -56,17 +50,8 @@ export default function Login() {
     <main className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-gray-100 to-gray-200">
       <div className="w-full max-w-md px-4 py-8 bg-white rounded-2xl shadow-xl transition-all duration-300 hover:shadow-2xl">
         <h1 className="text-3xl font-extrabold text-gray-900 mb-8 text-center">
-          Welcome Back!
+          Create Account
         </h1>
-
-        {showSuccess && (
-          <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center animate-fade-in">
-            <CheckCircleIcon className="h-5 w-5 text-emerald-600 mr-2" />
-            <span className="text-emerald-700">
-              Registration successful! Please login
-            </span>
-          </div>
-        )}
 
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center animate-fade-in">
@@ -80,17 +65,15 @@ export default function Login() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Username
             </label>
-            <div className="relative">
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
-                placeholder="Enter your username"
-                required
-                autoFocus={!registeredUsername}
-              />
-            </div>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+              placeholder="Enter your username"
+              required
+              autoFocus
+            />
           </div>
 
           <div>
@@ -101,11 +84,10 @@ export default function Login() {
               <input
                 type={showPassword ? "text" : "password"}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => handlePasswordChange(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all pr-12"
                 placeholder="••••••••"
                 required
-                autoFocus={!!registeredUsername}
               />
               <button
                 type="button"
@@ -118,6 +100,22 @@ export default function Login() {
                   <EyeIcon className="h-5 w-5" />
                 )}
               </button>
+            </div>
+            <div className="mt-2 flex gap-1">
+              {[...Array(4)].map((_, i) => (
+                <div
+                  key={i}
+                  className={`h-1.5 w-full rounded-full transition-colors ${
+                    passwordStrength > i
+                      ? i < 2
+                        ? "bg-red-400"
+                        : i < 3
+                        ? "bg-yellow-400"
+                        : "bg-green-500"
+                      : "bg-gray-200"
+                  }`}
+                />
+              ))}
             </div>
           </div>
 
@@ -148,21 +146,21 @@ export default function Login() {
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   ></path>
                 </svg>
-                Signing in...
+                Registering You...
               </>
             ) : (
-              "Sign in"
+              "Create Account"
             )}
           </button>
         </form>
 
         <p className="mt-8 text-center text-sm text-gray-600">
-          Don't have an account?{" "}
+          Already have an account?{" "}
           <a
-            href="/register"
+            href="/login"
             className="font-semibold text-orange-600 hover:text-orange-700 hover:underline"
           >
-            Create account
+            Login here
           </a>
         </p>
       </div>

@@ -46,7 +46,6 @@ interface AuthResponse {
   user: {
     id: number;
     username: string;
-    // Add other user fields as needed
   };
 }
 
@@ -68,12 +67,21 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
 
 export const api = {
 
+  register: async (credentials: LoginCredentials) => {
+    const response = await fetch(`${API_URL}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(credentials),
+    });
+    return handleResponse(response);
+  },
+
   login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
     try {
       const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json' 
+        headers: {
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(credentials),
       });
@@ -81,18 +89,18 @@ export const api = {
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(
-          errorData.message || 
+          errorData.message ||
           `Login failed with status ${response.status}: ${response.statusText}`
         );
       }
 
       const data: AuthResponse = await response.json();
-      
-      // Store token if authentication is successful
+
+      // Store the token if authentication is successful
       if (data.token) {
         localStorage.setItem('token', data.token);
       }
-      
+
       return data;
     } catch (error) {
       console.error('Login error:', error);

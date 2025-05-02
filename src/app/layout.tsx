@@ -25,19 +25,57 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <header>
-          <nav>
-            <ul className="flex gap-4 p-4">
-              <li><Link href="/">Home</Link></li>
-              <li><Link href="/login">Login</Link></li>
-              <li><Link href="/departments">Departments</Link></li>
-            </ul>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50`}>
+        <header className="border-b border-gray-200 bg-white mt-6">
+          <nav className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between h-16 items-center">
+              <Link 
+                href="/" 
+                className="text-3xl font-bold text-orange-600 hover:text-orange-700 transition-colors"
+              >
+                [||DM]
+              </Link>
+              <ul className="flex gap-6 items-center">
+                <li>
+                  <Link 
+                    href="/departments" 
+                    className="text-gray-700 hover:text-orange-600 transition-colors font-medium relative group"
+                  >
+                    Departments
+                    <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-orange-600 transition-all group-hover:w-full"></span>
+                  </Link>
+                </li>
+                <li>
+                  <Link 
+                    href="/login" 
+                    className="text-gray-700 hover:text-orange-600 transition-colors font-medium relative group"
+                  >
+                    Login
+                    <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-orange-600 transition-all group-hover:w-full"></span>
+                  </Link>
+                </li>
+                <li>
+                  <Link 
+                    href="/register" 
+                    className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors font-medium shadow-sm hover:shadow-orange-200"
+                  >
+                    Register
+                  </Link>
+                </li>
+              </ul>
+            </div>
           </nav>
         </header>
+        
         {children}
+        
+        <footer className="border-t border-gray-200 mt-16 bg-white">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center">
+            <p className="text-gray-600">
+              © 2025 [||DM] Department Management System. All rights reserved.
+            </p>
+          </div>
+        </footer>
       </body>
     </html>
   );
