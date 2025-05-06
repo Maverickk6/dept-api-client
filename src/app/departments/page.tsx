@@ -17,7 +17,10 @@ interface Department {
 export default function Departments() {
   const router = useRouter();
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [newDepartment, setNewDepartment] = useState("");
+  const [newDepartment, setNewDepartment] = useState<{
+    name: string;
+    subDepartments: string[];
+  }>({ name: "", subDepartments: [] });
   const [selectedDepartment, setSelectedDepartment] =
     useState<Department | null>(null);
   const [error, setError] = useState("");
@@ -82,17 +85,15 @@ export default function Departments() {
     e.preventDefault();
     try {
       setLoading((prev) => ({ ...prev, operations: true }));
-      const newDept = await api.createDepartment({ name: newDepartment });
+      const newDept = await api.createDepartment({
+        name: newDepartment.name,
+        subDepartments: newDepartment.subDepartments
+          .filter((name) => name.trim() !== "")
+          .map((name) => ({ name })),
+      });
 
       setDepartments((prev) => [newDept, ...prev]);
-      setEditingStates((prev) => ({
-        ...prev,
-        departments: {
-          ...prev.departments,
-          [newDept.id]: { isEditing: false, tempName: newDept.name },
-        },
-      }));
-      setNewDepartment("");
+      setNewDepartment({ name: "", subDepartments: [] });
       setError("");
     } catch (error) {
       setError(
@@ -102,6 +103,29 @@ export default function Departments() {
     } finally {
       setLoading((prev) => ({ ...prev, operations: false }));
     }
+  };
+
+  const addSubDepartmentField = () => {
+    setNewDepartment((prev) => ({
+      ...prev,
+      subDepartments: [...prev.subDepartments, ""],
+    }));
+  };
+
+  const removeSubDepartmentField = (index: number) => {
+    setNewDepartment((prev) => ({
+      ...prev,
+      subDepartments: prev.subDepartments.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleSubDepartmentChange = (index: number, value: string) => {
+    setNewDepartment((prev) => ({
+      ...prev,
+      subDepartments: prev.subDepartments.map((name, i) =>
+        i === index ? value : name
+      ),
+    }));
   };
 
   const toggleEditDepartment = (departmentId: number) => {
@@ -383,30 +407,117 @@ export default function Departments() {
               <h2 className="text-xl font-semibold text-gray-800 mb-4">
                 Create New Department
               </h2>
-              <form onSubmit={handleCreateDepartment} className="flex gap-4">
-                <input
-                  type="text"
-                  value={newDepartment}
-                  onChange={(e) => setNewDepartment(e.target.value)}
-                  placeholder="Department name"
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-                  required
-                  minLength={2}
-                />
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 transition-colors"
-                  disabled={loading.operations || !newDepartment.trim()}
-                >
-                  {loading.operations ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span>
-                      Creating...
-                    </span>
-                  ) : (
-                    "Create"
-                  )}
-                </button>
+              <form onSubmit={handleCreateDepartment} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Department Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={newDepartment.name}
+                    onChange={(e) =>
+                      setNewDepartment((prev) => ({
+                        ...prev,
+                        name: e.target.value,
+                      }))
+                    }
+                    placeholder="Enter department name"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                    required
+                    minLength={2}
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Sub-Departments (optional)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={addSubDepartmentField}
+                      className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                        />
+                      </svg>
+                      Add Sub-Department
+                    </button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {newDepartment.subDepartments.map((name, index) => (
+                      <div key={index} className="flex gap-2 items-center">
+                        <input
+                          type="text"
+                          value={name}
+                          onChange={(e) =>
+                            handleSubDepartmentChange(index, e.target.value)
+                          }
+                          placeholder={`Sub-department #${index + 1}`}
+                          className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                          minLength={2}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeSubDepartmentField(index)}
+                          className="text-red-500 hover:text-red-600 p-1 rounded-full hover:bg-red-50 transition-colors"
+                        >
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-4">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setNewDepartment({ name: "", subDepartments: [] })
+                    }
+                    className="px-4 py-2 text-gray-600 hover:text-gray-800 underline"
+                    disabled={loading.operations}
+                  >
+                    Reset Form
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 transition-colors"
+                    disabled={loading.operations || !newDepartment.name.trim()}
+                  >
+                    {loading.operations ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span>
+                        Creating...
+                      </span>
+                    ) : (
+                      "Create Department"
+                    )}
+                  </button>
+                </div>
               </form>
             </div>
 
